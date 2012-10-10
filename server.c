@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <fcntl.h>
 
 /*
 TODO
@@ -45,6 +46,9 @@ int main(int argc, char **argv)
 	time_t	ticks;
 	struct sockaddr_in cliaddr, time_servaddr, echo_servaddr;
 	socklen_t len;
+	const int sockopt = 1;
+	
+	int flags;
 
 	echo_listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	time_listenfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -58,10 +62,31 @@ int main(int argc, char **argv)
 	echo_servaddr.sin_family      = AF_INET;
 	echo_servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	echo_servaddr.sin_port        = htons(7675);
+	
+	setsockopt(echo_listenfd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt));
+	setsockopt(time_listenfd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt));
 
 	bind(echo_listenfd, (struct sockaddr *) &echo_servaddr, sizeof(echo_servaddr));
 	bind(time_listenfd, (struct sockaddr *) &time_servaddr, sizeof(time_servaddr));
 	
+	
+	if((flags = fcntl(time_listenfd, F_GETFL,0)) < 0)
+		printf("F_GETFL error in setting time listen socket to non blocking\n");
+	
+     	flags |= O_NONBLOCK;
+     	
+     	if((fcntl(time_listenfd, F_SETFL, flags)) < 0)
+     		printf("F_SETFL error in setting time listen socket to non blocking\n");
+ 
+ 	if((flags = fcntl(echo_listenfd, F_GETFL,0)) < 0)
+		printf("F_GETFL error in setting echo socket to non blocking\n");
+	
+     	flags |= O_NONBLOCK;
+     	
+     	if((fcntl(echo_listenfd, F_SETFL, flags)) < 0)
+     		printf("F_SETFL error in setting echo socket to non blocking\n");
+	
+     	
 	listen(echo_listenfd, LISTENQ);
 	listen(time_listenfd, LISTENQ);
 		
@@ -79,6 +104,9 @@ int main(int argc, char **argv)
 		{
 			len = sizeof(cliaddr);
 			connfd[conn_counter] = accept(time_listenfd, NULL, NULL);
+			flags &= ~O_NONBLOCK;
+			if(fcntl(connfd[conn_counter], F_SETFL, flags) < 0)
+				printf("F_SETFL error");
 			int iret1;
 			iret1 = pthread_create( &thread[conn_counter], NULL, &time_server, (void*) connfd[conn_counter]);
 			pthread_detach(thread[conn_counter]);
@@ -87,7 +115,10 @@ int main(int argc, char **argv)
 		if(FD_ISSET(echo_listenfd, &rset))
 		{
 			len = sizeof(cliaddr);
-			connfd[conn_counter] = accept(echo_listenfd, (struct sockaddr *) &cliaddr, &len);		
+			connfd[conn_counter] = accept(echo_listenfd, (struct sockaddr *) &cliaddr, &len);
+			flags &= ~O_NONBLOCK;
+			if(fcntl(connfd[conn_counter], F_SETFL, flags) < 0)
+				printf("F_SETFL error");
 			int iret2;
 			iret2 = pthread_create( &thread[conn_counter], NULL, &echo_server, (void*) connfd[conn_counter]);
 			pthread_detach(thread[conn_counter]);

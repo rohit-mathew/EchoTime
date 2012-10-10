@@ -46,10 +46,12 @@ int main(int argc, char **argv)
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(7675);
-	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); //TODO
+	servaddr.sin_addr.s_addr = inet_addr(argv[2]); //TODO
+	
 
 	if(connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) == -1)
 	{
+		sprintf(buf,"%s","\necho_client : Was unable to connect. Please check the server\n");
 		write(fd, buf,sizeof(buf));
 
 		sleep(5);
@@ -69,8 +71,7 @@ int main(int argc, char **argv)
 
 		if (read(sockfd, recvline, MAXLINE) < 1)
 		{
-			printf("echo_client: ERROR : server terminated prematurely. Exitting");
-			sprintf(buf,"%s","\necho_client: server terminated prematurely. Exitting\n");
+			sprintf(buf,"%s","\necho_client: Server terminated prematurely. Exitting\n");
 			write(fd, buf, sizeof(buf));
 			break;
 		}
